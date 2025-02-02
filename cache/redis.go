@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -15,7 +16,7 @@ type RedisServer struct {
 // Cahe - структура, экземпляр которой является одна запись в кэше
 type Cahe struct {
 	Key   string
-	Value interface{}
+	Value int
 }
 
 // Конструктор типа RedisServer
@@ -47,10 +48,14 @@ func (r *RedisServer) SetValue(v Cahe) error {
 }
 
 // GetValue возвращает значение по ключу из кэша с redis сервера
-func (r *RedisServer) GetValue() (interface{}, error) {
-	value, err := r.Client.Get(r.Ctx, "key").Result()
+func (r *RedisServer) GetValue(key string) (int, error) {
+	value, err := r.Client.Get(r.Ctx, key).Result()
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
-	return value, nil
+	sum, err := strconv.Atoi(value)
+	if err != nil {
+		return -1, err
+	}
+	return sum, nil
 }
