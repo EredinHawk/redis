@@ -3,8 +3,8 @@ package api
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -22,22 +22,25 @@ func TestHandlerSUM(t *testing.T) {
 
 	// Дважды вызвать обработчик: без кэша и с кэшем
 	for _, v := range testCases {
-		req, err := http.NewRequest("POST", "/", bytes.NewReader([]byte(`{"n1":2,"n2":2}`)))
+		// Выполннить http запрос с методом Get к API
+		response, err := http.Post("http://localhost:8090/", "application/json", bytes.NewReader([]byte(`{"n1":2,"n2":2}`)))
 		if err != nil {
 			t.Fatalf("%v\n", err)
 		}
-		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(HandlerSUM)
-		handler.ServeHTTP(rr, req)
 
-		result := rr.Result().Header.Get("cached")
-		
-		// Проверить соответствие ожидаемым результатам
-		if result != v.Excepted {
-			t.Fatalf("Excepted - %v, but received - %v", v.Excepted, result)
+		// Проверка ожидаемых данных
+		cache_status := response.Header.Get("cached")
+		if cache_status != v.Excepted {
+			t.Errorf("excepted - %v, but recived - %v", v.Excepted, cache_status)
 		}
 
-		fmt.Println(rr.Body.String())
+		// Для информации вывести результат в консоль
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			t.Errorf("%v\n", err)
+		}
+
+		fmt.Println(string(body))
 	}
 
 }

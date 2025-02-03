@@ -19,45 +19,50 @@ type Numbers struct {
 	N2 int `json:"n2"`
 }
 
-// HandlerSUM обработчик, который суммирует два числа из тела запроса и возвращает результат вычисления клиенту.
+// WrapHandler это обертка над обработчиком, которая прнимает на входе указатель на экземпляр RedisServer типа и
+// возвращает обработчик.
+//
+// Обработчик, суммирует два числа из тела запроса и возвращает результат вычисления клиенту.
 // При этом, если в кэше уже записан результат, то вычисление не будет производится. Обработчик вернет это значение из кэша.
-func HandlerSUM(w http.ResponseWriter, r *http.Request) {
-	// Считывание двух чисел из тела запроса
-	numbers, err := scanNumbers(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+func WrapHandler(redis *cache.RedisServer) http.HandlerFunc {
 
-	// Формирование из этих двух чисел ключ в кэше
-	key := keyGen(numbers)
-
-	// Проверка по ключу наличие данных в кэше
-	redis := cache.NewRedisServer()
-	cache_check, err := redis.CheckValue(key)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	// Если данных в кэше нет, произвести вычисление
-	if !cache_check {
-		result = sum(numbers)
-
-		// Результат вычисления записать в кэш
-		err := redis.SetValue(cache.Cahe{Key: key, Value: result})
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Считывание двух чисел из тела запроса
+		numbers, err := scanNumbers(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		w.Header().Add("cached", "false")
-		fmt.Fprintf(w, "%v + %v = %v - данные получены из расчета API", numbers.N1, numbers.N2, result)
 
-	// Если данные в кэше присутствуют, получить их
-	} else {
-		result, err = redis.GetValue(key)
+		// Формирование из этих двух чисел ключ в кэше
+		key := keyGen(numbers)
+
+		// Проверка по ключу наличие данных в кэше
+		cache_check, err := redis.CheckValue(key)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		w.Header().Add("cached", "true")
-		fmt.Fprintf(w, "%v + %v = %v - данные получены из кэша", numbers.N1, numbers.N2, result)
+
+		// Если данных в кэше нет, произвести вычисление
+		if !cache_check {
+			result = sum(numbers)
+
+			// Результат вычисления записать в кэш
+			err := redis.SetValue(cache.Cahe{Key: key, Value: result})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			w.Header().Add("cached", "false")
+			fmt.Fprintf(w, "%v + %v = %v - данные получены из расчета API", numbers.N1, numbers.N2, result)
+
+		// Если данные в кэше присутствуют, получить их
+		} else {
+			result, err = redis.GetValue(key)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			w.Header().Add("cached", "true")
+			fmt.Fprintf(w, "%v + %v = %v - данные получены из кэша", numbers.N1, numbers.N2, result)
+		}
 	}
 }
 
